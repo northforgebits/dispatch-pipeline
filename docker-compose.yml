@@ -1,0 +1,12 @@
+ services:
+  postgres:
+     image: postgres:15
+     environment: 
+      POSTGRES_USER: phoenixpipeline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: phoenixpipeline
+     ports: ["5432:5432"]
+     volumes: [pgdata:/var/lib/postgresql/data]
+
+ volumes:
+  pgdata:
