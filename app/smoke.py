@@ -1,42 +1,33 @@
-import httpx
 from pydantic import ValidationError
 
-from app.config import settings
 from app.models import CallForService
+from app.phoenix_data_client import fetch_phx_data_records
+
 
 def main():
-    params_query = {
-        "resource_id": settings.resource_id,
-        "limit": settings.ingest_limit,
-    }
+    raw_records = fetch_phx_data_records()
 
-    with httpx.Client() as client:
-        response = client.get(settings.ckan_base_url, params=params_query)
-        data = response.json()
-        
-        if not data["success"]:  
-            print(data["error"]) 
-        else:
-            records = data["result"]["records"]
-            total = data["result"]["total"]
-            
-            grid_counter = 0
-            
-            for record in records:
-                try:
-                    validate_record = CallForService.model_validate(record)
-                    print(validate_record)
-                    
-                    if validate_record.grid is None:
-                        grid_counter = grid_counter + 1
-                        
-                except ValidationError as error:
-                    print("Bad record:")
-                    print(error)
-                
-            print(f"Grid was empty: {grid_counter} times")
-            print(len(records))
-            print(total)
+    grid_counter = 0
+    valid_counter = 0
+    bad_counter = 0
+
+    for raw_record in raw_records:
+        try:
+            validated_record = CallForService.model_validate(raw_record)
+            valid_counter += 1
+
+            if validated_record.grid is None:
+                grid_counter += 1
+
+        except ValidationError as error:
+            bad_counter += 1
+            print("Bad record:")
+            print(error)
+
+    print(f"Fetched raw records: {len(raw_records)}")
+    print(f"Valid records: {valid_counter}")
+    print(f"Bad records: {bad_counter}")
+    print(f"Grid was empty: {grid_counter} times")
 
 
 if __name__ == "__main__":
