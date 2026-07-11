@@ -5,7 +5,6 @@ import httpx
 from app.config import settings
 
 def fetch_phx_data_records() -> list[dict[ str, Any]]:
-    
     all_raw_records = []
     offset = 0
     
@@ -56,5 +55,4 @@ def fetch_phx_data_records() -> list[dict[ str, Any]]:
             
             time.sleep(0.15)
             
-        return all_raw_records     
-            
+        return all_raw_records

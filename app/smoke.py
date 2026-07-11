@@ -1,33 +1,54 @@
+import time
+import uuid
+
+import structlog
 from pydantic import ValidationError
 
+from app.logging_config import configure_logging
 from app.models import CallForService
 from app.phoenix_data_client import fetch_phx_data_records
 
 
 def main():
-    raw_records = fetch_phx_data_records()
+    configure_logging()
 
-    grid_counter = 0
-    valid_counter = 0
-    bad_counter = 0
+    run_id = str(uuid.uuid4())
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(run_id=run_id)
 
-    for raw_record in raw_records:
-        try:
-            validated_record = CallForService.model_validate(raw_record)
-            valid_counter += 1
+    logger = structlog.get_logger()
+    logger.info("run_started", status="started")
+    start_time = time.monotonic()
 
-            if validated_record.grid is None:
-                grid_counter += 1
+    try:
+        raw_records = fetch_phx_data_records()
 
-        except ValidationError as error:
-            bad_counter += 1
-            print("Bad record:")
-            print(error)
+        valid_counter = 0
+        bad_counter = 0
 
-    print(f"Fetched raw records: {len(raw_records)}")
-    print(f"Valid records: {valid_counter}")
-    print(f"Bad records: {bad_counter}")
-    print(f"Grid was empty: {grid_counter} times")
+        for raw_record in raw_records:
+            try:
+                CallForService.model_validate(raw_record)
+                valid_counter += 1
+            except ValidationError:
+                bad_counter += 1
+
+        logger.info(
+            "run_completed",
+            pulled=len(raw_records),
+            validated=valid_counter,
+            failed=bad_counter,
+            duration_seconds=time.monotonic() - start_time,
+            status="completed",
+        )
+    except Exception as error:
+        logger.error(
+            "run_failed",
+            status="failed",
+            error=str(error),
+            duration_seconds=time.monotonic() - start_time,
+        )
+        raise
 
 
 if __name__ == "__main__":
