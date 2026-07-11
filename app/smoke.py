@@ -4,7 +4,7 @@ import uuid
 import structlog
 from pydantic import ValidationError
 
-from app.database import write_records
+from app.database import upsert_records
 from app.logging_config import configure_logging
 from app.models import CallForService
 from app.phoenix_data_client import fetch_phx_data_records
@@ -46,7 +46,7 @@ def main():
             except (TypeError, ValueError):
                 transform_failed_counter += 1
 
-        inserted = write_records(rows)
+        upserted = upsert_records(rows)
 
         logger.info(
             "ingestion_run_completed",
@@ -54,9 +54,9 @@ def main():
             validated=valid_counter,
             failed=bad_counter + transform_failed_counter,
             transform_failed=transform_failed_counter,
-            inserted=inserted,
+            upserted=upserted,
             duration_seconds=time.monotonic() - start_time,
-            status="completed",
+            status="success",
         )
     except Exception as error:
         error_to_log = getattr(error, "orig", error)
