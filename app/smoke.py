@@ -4,9 +4,11 @@ import uuid
 import structlog
 from pydantic import ValidationError
 
+from app.database import write_records
 from app.logging_config import configure_logging
 from app.models import CallForService
 from app.phoenix_data_client import fetch_phx_data_records
+from app.transform import to_record_row
 
 
 def main():
@@ -17,35 +19,51 @@ def main():
     structlog.contextvars.bind_contextvars(run_id=run_id)
 
     logger = structlog.get_logger()
-    logger.info("run_started", status="started")
+    logger.info("ingestion_run_started", status="started")
     start_time = time.monotonic()
 
     try:
         raw_records = fetch_phx_data_records()
 
+        validated_records = []
         valid_counter = 0
         bad_counter = 0
 
         for raw_record in raw_records:
             try:
-                CallForService.model_validate(raw_record)
+                validated = CallForService.model_validate(raw_record)
+                validated_records.append(validated)
                 valid_counter += 1
             except ValidationError:
                 bad_counter += 1
 
+        rows = []
+        transform_failed_counter = 0
+
+        for validated in validated_records:
+            try:
+                rows.append(to_record_row(validated))
+            except (TypeError, ValueError):
+                transform_failed_counter += 1
+
+        inserted = write_records(rows)
+
         logger.info(
-            "run_completed",
+            "ingestion_run_completed",
             pulled=len(raw_records),
             validated=valid_counter,
-            failed=bad_counter,
+            failed=bad_counter + transform_failed_counter,
+            transform_failed=transform_failed_counter,
+            inserted=inserted,
             duration_seconds=time.monotonic() - start_time,
             status="completed",
         )
     except Exception as error:
+        error_to_log = getattr(error, "orig", error)
         logger.error(
-            "run_failed",
+            "ingestion_run_failed",
             status="failed",
-            error=str(error),
+            error=str(error_to_log),
             duration_seconds=time.monotonic() - start_time,
         )
         raise
