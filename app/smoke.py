@@ -84,22 +84,32 @@ def main():
     except Exception as error:
         error_to_log = getattr(error, "orig", error)
 
-        with SessionLocal() as session:
-            pipeline_run = session.get(PipelineRun, run_id)
-            if pipeline_run is None:
-                raise RuntimeError(f"Pipeline run {run_id} was not found")
-
-            pipeline_run.finished_at = datetime.now(timezone.utc)
-            pipeline_run.status = "failed"
-            pipeline_run.error = str(error_to_log)
-            session.commit()
-
         logger.error(
             "ingestion_run_failed",
             status="failed",
             error=str(error_to_log),
             duration_seconds=time.monotonic() - start_time,
         )
+
+        try:
+            with SessionLocal() as session:
+                pipeline_run = session.get(PipelineRun, run_id)
+                if pipeline_run is None:
+                    raise RuntimeError(f"Pipeline run {run_id} was not found")
+
+                pipeline_run.finished_at = datetime.now(timezone.utc)
+                pipeline_run.status = "failed"
+                pipeline_run.error = str(error_to_log)
+                session.commit()
+        except Exception as audit_error:
+            audit_error_to_log = getattr(audit_error, "orig", audit_error)
+            logger.error(
+                "pipeline_run_failure_update_failed",
+                error=str(audit_error_to_log),
+                ingestion_error=str(error_to_log),
+                duration_seconds=time.monotonic() - start_time,
+            )
+
         raise
 
 

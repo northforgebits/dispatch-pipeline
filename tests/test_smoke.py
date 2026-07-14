@@ -127,6 +127,7 @@ def test_failed_run_updates_separately_committed_start_row(monkeypatch):
             events.append((event, fields))
 
         def error(self, event, **fields):
+            assert [commit["status"] for commit in commits] == ["running"]
             events.append((event, fields))
 
     def fail_fetch():
@@ -172,3 +173,63 @@ def test_failed_run_updates_separately_committed_start_row(monkeypatch):
     )
     assert failed_log["status"] == "failed"
     assert failed_log["error"] == "Safety Cap Reached"
+
+
+def test_failed_audit_update_preserves_original_error(monkeypatch):
+    events = []
+    runs = {}
+    commits = []
+    run_id = "missing-audit-run"
+    session_calls = 0
+
+    class FakeLogger:
+        def info(self, event, **fields):
+            events.append((event, fields))
+
+        def error(self, event, **fields):
+            events.append((event, fields))
+
+    def session_local():
+        nonlocal session_calls
+        session_calls += 1
+        session = FakeAuditSession(runs, commits)
+        if session_calls == 2:
+            session.get = lambda model, requested_run_id: None
+        return session
+
+    def fail_fetch():
+        raise RuntimeError("Safety Cap Reached")
+
+    monkeypatch.setattr(smoke, "configure_logging", lambda: None)
+    monkeypatch.setattr(
+        smoke.structlog.contextvars,
+        "clear_contextvars",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        smoke.structlog.contextvars,
+        "bind_contextvars",
+        lambda **fields: None,
+    )
+    monkeypatch.setattr(smoke.structlog, "get_logger", FakeLogger)
+    monkeypatch.setattr(smoke.uuid, "uuid4", lambda: run_id)
+    monkeypatch.setattr(smoke, "SessionLocal", session_local)
+    monkeypatch.setattr(smoke, "fetch_phx_data_records", fail_fetch)
+
+    with pytest.raises(RuntimeError, match="^Safety Cap Reached$"):
+        smoke.main()
+
+    assert [commit["status"] for commit in commits] == ["running"]
+
+    failed_log = next(
+        fields for event, fields in events if event == "ingestion_run_failed"
+    )
+    assert failed_log["error"] == "Safety Cap Reached"
+
+    audit_log = next(
+        fields
+        for event, fields in events
+        if event == "pipeline_run_failure_update_failed"
+    )
+    assert audit_log["error"] == f"Pipeline run {run_id} was not found"
+    assert audit_log["ingestion_error"] == "Safety Cap Reached"
