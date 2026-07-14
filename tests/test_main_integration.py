@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.database_models import Record
+from app.database_models import PipelineRun, Record
 from app.main import app
 
 
@@ -42,6 +42,85 @@ def records_client(clean_records_table):
             yield client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def pipeline_status_client(clean_records_table):
+    bind = clean_records_table.get_bind()
+
+    def override_get_db():
+        with Session(bind) as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(app) as client:
+            yield client, clean_records_table
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_pipeline_status_returns_200_when_no_runs_exist(
+    pipeline_status_client,
+):
+    client, _ = pipeline_status_client
+
+    response = client.get("/pipeline/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "No pipeline runs yet."}
+
+
+def test_pipeline_status_returns_most_recent_run(pipeline_status_client):
+    client, db = pipeline_status_client
+    older_started_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    latest_started_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+    latest_finished_at = latest_started_at + timedelta(minutes=5)
+    db.add_all(
+        [
+            PipelineRun(
+                id="00000000-0000-4000-8000-000000000002",
+                started_at=latest_started_at,
+                finished_at=latest_finished_at,
+                records_ingested=42,
+                status="success",
+            ),
+            PipelineRun(
+                id="00000000-0000-4000-8000-000000000001",
+                started_at=older_started_at,
+                finished_at=older_started_at + timedelta(minutes=1),
+                records_ingested=None,
+                status="failed",
+                error="older failure",
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get("/pipeline/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {
+        "started_at",
+        "finished_at",
+        "records_ingested",
+        "status",
+        "error",
+    }
+    assert datetime.fromisoformat(body["started_at"]) == latest_started_at
+    assert datetime.fromisoformat(body["finished_at"]) == latest_finished_at
+    assert body["records_ingested"] == 42
+    assert body["status"] == "success"
+    assert body["error"] is None
+
+
+def test_pipeline_status_is_registered_in_docs(pipeline_status_client):
+    client, _ = pipeline_status_client
+
+    assert client.get("/docs").status_code == 200
+    openapi = client.get("/openapi.json").json()
+    assert "/pipeline/status" in openapi["paths"]
 
 
 def test_records_default_limit_is_bounded(records_client):

@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
 import time
 import uuid
 
 import structlog
 from pydantic import ValidationError
 
-from app.database import upsert_records
+from app.database import SessionLocal, upsert_records
+from app.database_models import PipelineRun
 from app.logging_config import configure_logging
 from app.models import CallForService
 from app.phoenix_data_client import fetch_phx_data_records
@@ -19,8 +21,19 @@ def main():
     structlog.contextvars.bind_contextvars(run_id=run_id)
 
     logger = structlog.get_logger()
-    logger.info("ingestion_run_started", status="started")
     start_time = time.monotonic()
+
+    with SessionLocal() as session:
+        session.add(
+            PipelineRun(
+                id=run_id,
+                started_at=datetime.now(timezone.utc),
+                status="running",
+            )
+        )
+        session.commit()
+
+    logger.info("ingestion_run_started", status="started")
 
     try:
         raw_records = fetch_phx_data_records()
@@ -48,6 +61,16 @@ def main():
 
         upserted = upsert_records(rows)
 
+        with SessionLocal() as session:
+            pipeline_run = session.get(PipelineRun, run_id)
+            if pipeline_run is None:
+                raise RuntimeError(f"Pipeline run {run_id} was not found")
+
+            pipeline_run.finished_at = datetime.now(timezone.utc)
+            pipeline_run.records_ingested = upserted
+            pipeline_run.status = "success"
+            session.commit()
+
         logger.info(
             "ingestion_run_completed",
             pulled=len(raw_records),
@@ -60,6 +83,17 @@ def main():
         )
     except Exception as error:
         error_to_log = getattr(error, "orig", error)
+
+        with SessionLocal() as session:
+            pipeline_run = session.get(PipelineRun, run_id)
+            if pipeline_run is None:
+                raise RuntimeError(f"Pipeline run {run_id} was not found")
+
+            pipeline_run.finished_at = datetime.now(timezone.utc)
+            pipeline_run.status = "failed"
+            pipeline_run.error = str(error_to_log)
+            session.commit()
+
         logger.error(
             "ingestion_run_failed",
             status="failed",

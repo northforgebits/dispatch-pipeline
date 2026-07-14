@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.database_models import Record
+from app.database_models import PipelineRun, Record
 from app.schemas import RecordOut
 
 
@@ -22,6 +22,27 @@ def phoenix_day_start_utc(day: date) -> datetime:
     return datetime.combine(day, time.min, tzinfo=PHOENIX_TIMEZONE).astimezone(
         timezone.utc
     )
+
+
+@app.get("/pipeline/status")
+def pipeline_status(db: Session = Depends(get_db)):
+    stmt = (
+        select(PipelineRun)
+        .order_by(PipelineRun.started_at.desc())
+        .limit(1)
+    )
+    latest_run = db.scalar(stmt)
+
+    if latest_run is None:
+        return {"message": "No pipeline runs yet."}
+
+    return {
+        "started_at": latest_run.started_at,
+        "finished_at": latest_run.finished_at,
+        "records_ingested": latest_run.records_ingested,
+        "status": latest_run.status,
+        "error": latest_run.error,
+    }
 
 
 @app.get("/records", response_model=list[RecordOut])
