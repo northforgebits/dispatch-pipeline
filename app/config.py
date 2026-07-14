@@ -8,10 +8,9 @@ class Settings(BaseSettings):
     resource_id: str
     ingest_limit: int
     ingest_interval: int
+    max_pages: int = 100
     
 #self note: python imports a module once and caches it, so every file 
 #importing settings gets the same object. One object shared across imports,
 #as long as you only instantiate it once at module level
 settings = Settings()
-    
-    

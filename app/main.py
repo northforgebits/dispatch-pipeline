@@ -1,11 +1,15 @@
+from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import smoke
+from app.config import settings
 from app.database import get_db
 from app.database_models import PipelineRun, Record
 from app.schemas import RecordOut
@@ -15,7 +19,26 @@ PHOENIX_TIMEZONE = ZoneInfo("America/Phoenix")
 DEFAULT_RECORDS_LIMIT = 100
 MAX_RECORDS_LIMIT = 500
 
-app = FastAPI()
+scheduler = BackgroundScheduler()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.add_job(
+        smoke.main,
+        "interval",
+        seconds=settings.ingest_interval,
+        id="ingestion_job",
+        max_instances=1,
+    )
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=True)
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 def phoenix_day_start_utc(day: date) -> datetime:
