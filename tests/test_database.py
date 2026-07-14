@@ -5,7 +5,7 @@ from sqlalchemy.dialects import postgresql
 from app import database
 
 
-def test_upsert_records_uses_named_constraint_and_safe_update_columns(monkeypatch):
+def test_upsert_records_uses_named_constraint_and_safe_update_columns():
     captured = {}
 
     class FakeSession:
@@ -22,8 +22,6 @@ def test_upsert_records_uses_named_constraint_and_safe_update_columns(monkeypatc
         def commit(self):
             captured["committed"] = True
 
-    monkeypatch.setattr(database, "SessionLocal", FakeSession)
-
     affected = database.upsert_records(
         [
             {
@@ -31,7 +29,8 @@ def test_upsert_records_uses_named_constraint_and_safe_update_columns(monkeypatc
                 "occurred_at": None,
                 "raw_fields": {"incident_num": "incident-1"},
             }
-        ]
+        ],
+        session=FakeSession(),
     )
 
     sql = str(
