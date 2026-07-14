@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, func
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
@@ -13,7 +13,11 @@ engine = create_engine(settings.database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine)
 
 
-def upsert_records(rows: list[dict]) -> int:
+def upsert_records(
+    rows: list[dict],
+    *,
+    session: Session | None = None,
+) -> int:
     from app.database_models import Record
 
     if not rows:
@@ -35,8 +39,13 @@ def upsert_records(rows: list[dict]) -> int:
         },
     )
 
-    with SessionLocal() as session:
+    if session is not None:
         result = session.execute(stmt)
         session.commit()
+        return result.rowcount
+
+    with SessionLocal() as owned_session:
+        result = owned_session.execute(stmt)
+        owned_session.commit()
 
     return result.rowcount
