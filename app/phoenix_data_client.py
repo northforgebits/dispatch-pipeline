@@ -10,12 +10,11 @@ def fetch_phx_data_records() -> list[dict[ str, Any]]:
     
     page_size = settings.ingest_limit
     pages_fetched = 0
-    MAX_PAGES = 100
     
     with httpx.Client() as client:
         while True:
             
-            if pages_fetched >= MAX_PAGES:
+            if pages_fetched >= settings.max_pages:
                 raise RuntimeError("Safety Cap Reached")
             
             #limit is the maximum number of rows to return,
