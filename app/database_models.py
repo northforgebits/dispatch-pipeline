@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import DateTime, Text, UniqueConstraint
+from sqlalchemy import DateTime, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,3 +32,17 @@ class Record(Base):
     final_call_type: Mapped[str] = mapped_column(Text)
     hundred_block_addr: Mapped[str] = mapped_column(Text)
     grid: Mapped[str | None] = mapped_column(Text)
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    records_ingested: Mapped[int | None] = mapped_column(nullable=True)
+    status: Mapped[str] = mapped_column(Text)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -3,6 +3,24 @@ from types import SimpleNamespace
 from sqlalchemy.dialects import postgresql
 
 from app import database
+from app.database_models import PipelineRun
+
+
+def test_pipeline_run_model_matches_audit_schema():
+    columns = PipelineRun.__table__.columns
+
+    assert PipelineRun.__tablename__ == "pipeline_runs"
+    assert columns.id.type.python_type is str
+    assert columns.id.type.length == 36
+    assert columns.id.primary_key is True
+    assert columns.id.default is None
+    assert columns.started_at.type.timezone is True
+    assert columns.started_at.nullable is False
+    assert columns.finished_at.type.timezone is True
+    assert columns.finished_at.nullable is True
+    assert columns.records_ingested.nullable is True
+    assert columns.status.nullable is False
+    assert columns.error.nullable is True
 
 
 def test_upsert_records_uses_named_constraint_and_safe_update_columns():
