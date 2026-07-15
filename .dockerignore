@@ -1,0 +1,9 @@
+.venv/
+.env
+.git/
+.github/
+tests/
+.pytest_cache/
+requirements-dev.txt
+**/__pycache__/
+*.py[cod]
