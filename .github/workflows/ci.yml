@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: phoenixpipeline
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+          POSTGRES_DB: phoenixpipeline
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U phoenixpipeline -d phoenixpipeline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://phoenixpipeline:${{ github.run_id }}-${{ github.run_attempt }}@localhost:5432/phoenixpipeline
+      CKAN_BASE_URL: https://www.phoenixopendata.com/api/3/action/datastore_search
+      RESOURCE_ID: ed707785-26b6-4949-9b04-5700b8a0125c
+      INGEST_LIMIT: "5000"
+      INGEST_INTERVAL: "3600"
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt --break-system-packages
+      - run: alembic upgrade head
+      - run: pytest -q
