@@ -1,21 +1,21 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, timedelta
+from pathlib import Path
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, Query, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import smoke
+from app import smoke, stats
 from app.config import settings
 from app.database import get_db
 from app.database_models import PipelineRun, Record
 from app.schemas import RecordOut
+from app.transform import phoenix_day_start_utc
 
-
-PHOENIX_TIMEZONE = ZoneInfo("America/Phoenix")
 DEFAULT_RECORDS_LIMIT = 100
 MAX_RECORDS_LIMIT = 500
 
@@ -39,12 +39,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-
-
-def phoenix_day_start_utc(day: date) -> datetime:
-    return datetime.combine(day, time.min, tzinfo=PHOENIX_TIMEZONE).astimezone(
-        timezone.utc
-    )
+app.include_router(stats.router)
 
 
 @app.get("/pipeline/status")
@@ -100,3 +95,8 @@ def list_records(
     response.headers["X-Has-More"] = str(has_more).lower()
 
     return records
+
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+if STATIC_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
