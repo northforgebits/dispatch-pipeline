@@ -1,7 +1,13 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 PHOENIX = ZoneInfo("America/Phoenix")
+
+
+def phoenix_day_start_utc(day: date) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=PHOENIX).astimezone(
+        timezone.utc
+    )
 
 
 def to_record_row(validated) -> dict:
