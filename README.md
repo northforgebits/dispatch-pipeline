@@ -2,11 +2,11 @@
 
 A service for City of Phoenix public safety dispatch data. It pulls 400,000+ real dispatch records from the city's open data portal on an hourly schedule, upserts them into PostgreSQL in a way that is safe to re-run, and serves them through a public API and a live data explorer.
 
-*Live explorer:* https://phoenix-pipeline-production.up.railway.app/
-*API docs:* https://phoenix-pipeline-production.up.railway.app/docs
-*Pipeline health:* https://phoenix-pipeline-production.up.railway.app/pipeline/status
+*Live explorer:* https://dispatch-calls-for-service.up.railway.app/
+*API docs:* https://dispatch-calls-for-service.up.railway.app/docs
+*Pipeline health:* https://dispatch-calls-for-service.up.railway.app/pipeline/status
 
-![CI](https://github.com/northforgebits/phoenix-pipeline/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/northforgebits/dispatch-pipeline/actions/workflows/ci.yml/badge.svg)
 
 ![Screenshot of the live data explorer](docs/screenshot.png)
 
@@ -67,8 +67,8 @@ Two details worth noting: The daily counts bucket by Phoenix calendar day in SQL
 Requires Docker, Python 3.11+, and Node 20+.
 
 ```bash
-git clone https://github.com/northforgebits/phoenix-pipeline
-cd phoenix-pipeline
+git clone https://github.com/northforgebits/dispatch-pipeline
+cd dispatch-pipeline
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
 docker-compose up -d                                 # PostgreSQL 15

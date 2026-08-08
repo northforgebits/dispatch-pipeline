@@ -106,7 +106,7 @@ export default function App() {
         </div>
         <nav className="links" aria-label="Project links">
           <a href="/docs">API docs</a>
-          <a href="https://github.com/northforgebits/phoenix-pipeline">Source</a>
+          <a href="https://github.com/northforgebits/dispatch-pipeline">Source</a>
         </nav>
       </header>
 
