@@ -60,7 +60,7 @@ def test_completion_log_reports_upserted_without_skipped(monkeypatch):
     def fetch_records():
         assert runs[run_id].status == "running"
         assert [commit["status"] for commit in commits] == ["running"]
-        return raw_records
+        return [raw_records]
 
     monkeypatch.setattr(smoke, "configure_logging", lambda: None)
     monkeypatch.setattr(
@@ -80,7 +80,7 @@ def test_completion_log_reports_upserted_without_skipped(monkeypatch):
         "SessionLocal",
         fake_session_local(runs, commits),
     )
-    monkeypatch.setattr(smoke, "fetch_phx_data_records", fetch_records)
+    monkeypatch.setattr(smoke, "iter_phx_data_pages", fetch_records)
     monkeypatch.setattr(
         smoke.CallForService,
         "model_validate",
@@ -153,7 +153,7 @@ def test_failed_run_updates_separately_committed_start_row(monkeypatch):
         "SessionLocal",
         fake_session_local(runs, commits),
     )
-    monkeypatch.setattr(smoke, "fetch_phx_data_records", fail_fetch)
+    monkeypatch.setattr(smoke, "iter_phx_data_pages", fail_fetch)
 
     with pytest.raises(RuntimeError, match="Safety Cap Reached"):
         smoke.main()
@@ -214,7 +214,7 @@ def test_failed_audit_update_preserves_original_error(monkeypatch):
     monkeypatch.setattr(smoke.structlog, "get_logger", FakeLogger)
     monkeypatch.setattr(smoke.uuid, "uuid4", lambda: run_id)
     monkeypatch.setattr(smoke, "SessionLocal", session_local)
-    monkeypatch.setattr(smoke, "fetch_phx_data_records", fail_fetch)
+    monkeypatch.setattr(smoke, "iter_phx_data_pages", fail_fetch)
 
     with pytest.raises(RuntimeError, match="^Safety Cap Reached$"):
         smoke.main()

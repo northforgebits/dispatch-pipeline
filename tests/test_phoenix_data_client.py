@@ -35,6 +35,6 @@ def test_fetch_raises_when_max_pages_reached_before_total(monkeypatch):
     monkeypatch.setattr(phoenix_data_client.time, "sleep", lambda seconds: None)
 
     with pytest.raises(RuntimeError, match="^Safety Cap Reached$"):
-        phoenix_data_client.fetch_phx_data_records()
+        list(phoenix_data_client.iter_phx_data_pages())
 
     assert len(requests) == 1

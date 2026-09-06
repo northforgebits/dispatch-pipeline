@@ -9,7 +9,7 @@ from app.database import SessionLocal, upsert_records
 from app.database_models import PipelineRun
 from app.logging_config import configure_logging
 from app.models import CallForService
-from app.phoenix_data_client import fetch_phx_data_records
+from app.phoenix_data_client import iter_phx_data_pages
 from app.transform import to_record_row
 
 
@@ -36,30 +36,31 @@ def main():
     logger.info("ingestion_run_started", status="started")
 
     try:
-        raw_records = fetch_phx_data_records()
-
-        validated_records = []
+        pulled_counter = 0
         valid_counter = 0
         bad_counter = 0
-
-        for raw_record in raw_records:
-            try:
-                validated = CallForService.model_validate(raw_record)
-                validated_records.append(validated)
-                valid_counter += 1
-            except ValidationError:
-                bad_counter += 1
-
-        rows = []
         transform_failed_counter = 0
+        upserted = 0
 
-        for validated in validated_records:
-            try:
-                rows.append(to_record_row(validated))
-            except (TypeError, ValueError):
-                transform_failed_counter += 1
+        for page in iter_phx_data_pages():
+            pulled_counter += len(page)
+            rows = []
 
-        upserted = upsert_records(rows)
+            for raw_record in page:
+                try:
+                    validated = CallForService.model_validate(raw_record)
+                except ValidationError:
+                    bad_counter += 1
+                    continue
+
+                valid_counter += 1
+
+                try:
+                    rows.append(to_record_row(validated))
+                except (TypeError, ValueError):
+                    transform_failed_counter += 1
+
+            upserted += upsert_records(rows)
 
         with SessionLocal() as session:
             pipeline_run = session.get(PipelineRun, run_id)
@@ -73,7 +74,7 @@ def main():
 
         logger.info(
             "ingestion_run_completed",
-            pulled=len(raw_records),
+            pulled=pulled_counter,
             validated=valid_counter,
             failed=bad_counter + transform_failed_counter,
             transform_failed=transform_failed_counter,
