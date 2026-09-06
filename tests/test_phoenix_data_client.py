@@ -20,6 +20,9 @@ def test_fetch_raises_when_max_pages_reached_before_total(monkeypatch):
             }
 
     class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
         def __enter__(self):
             return self
 

@@ -7,7 +7,8 @@ class Settings(BaseSettings):
     ckan_base_url: str
     resource_id: str
     ingest_limit: int
-    ingest_interval: int
+    ingest_hour: int = 13
+    ingest_lookback_days: int = 21
     max_pages: int = 100
     
 #self note: python imports a module once and caches it, so every file 

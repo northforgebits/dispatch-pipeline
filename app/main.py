@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import Annotated
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from fastapi import Depends, FastAPI, Query, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from zoneinfo import ZoneInfo
 
 from app import smoke, stats
 from app.config import settings
@@ -18,6 +20,7 @@ from app.transform import phoenix_day_start_utc
 
 DEFAULT_RECORDS_LIMIT = 100
 MAX_RECORDS_LIMIT = 500
+PHOENIX = ZoneInfo("America/Phoenix")
 
 scheduler = BackgroundScheduler()
 
@@ -26,8 +29,7 @@ scheduler = BackgroundScheduler()
 async def lifespan(app: FastAPI):
     scheduler.add_job(
         smoke.main,
-        "interval",
-        seconds=settings.ingest_interval,
+        CronTrigger(hour=settings.ingest_hour, minute=0, timezone=PHOENIX),
         id="ingestion_job",
         max_instances=1,
     )

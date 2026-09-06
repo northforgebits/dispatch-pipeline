@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import time
 import uuid
 
 import structlog
 from pydantic import ValidationError
 
+from app.config import settings
 from app.database import SessionLocal, upsert_records
 from app.database_models import PipelineRun
 from app.logging_config import configure_logging
@@ -40,7 +41,12 @@ def main():
         valid_counter = 0
         bad_counter = 0
         transform_failed_counter = 0
+        skipped_stale_counter = 0
         upserted = 0
+
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=settings.ingest_lookback_days
+        )
 
         for page in iter_phx_data_pages():
             pulled_counter += len(page)
@@ -56,9 +62,17 @@ def main():
                 valid_counter += 1
 
                 try:
-                    rows.append(to_record_row(validated))
+                    row = to_record_row(validated)
                 except (TypeError, ValueError):
                     transform_failed_counter += 1
+                    continue
+
+                occurred_at = row.get("occurred_at")
+                if occurred_at is not None and occurred_at < cutoff:
+                    skipped_stale_counter += 1
+                    continue
+
+                rows.append(row)
 
             upserted += upsert_records(rows)
 
@@ -78,6 +92,7 @@ def main():
             validated=valid_counter,
             failed=bad_counter + transform_failed_counter,
             transform_failed=transform_failed_counter,
+            skipped_stale=skipped_stale_counter,
             upserted=upserted,
             duration_seconds=time.monotonic() - start_time,
             status="success",
