@@ -10,16 +10,17 @@ def phoenix_day_start_utc(day: date) -> datetime:
     )
 
 
-def to_record_row(validated) -> dict:
-    occurred_at = datetime.strptime(
-        validated.call_received,
-        "%m/%d/%Y %I:%M:%S %p",
-    )
+def parse_call_received(call_received: str) -> datetime:
+    occurred_at = datetime.strptime(call_received, "%m/%d/%Y %I:%M:%S %p")
 
     if occurred_at.tzinfo is None:
         occurred_at = occurred_at.replace(tzinfo=PHOENIX)
 
-    occurred_at = occurred_at.astimezone(timezone.utc)
+    return occurred_at.astimezone(timezone.utc)
+
+
+def to_record_row(validated) -> dict:
+    occurred_at = parse_call_received(validated.call_received)
     raw_fields = validated.model_dump()
 
     return {

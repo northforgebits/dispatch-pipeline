@@ -73,7 +73,7 @@ python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Act
 pip install -r requirements-dev.txt
 docker-compose up -d                                 # PostgreSQL 15
 # create .env with: DATABASE_URL, CKAN_BASE_URL, RESOURCE_ID,
-#                   INGEST_LIMIT, INGEST_INTERVAL, MAX_PAGES
+#                   INGEST_LIMIT, INGEST_INTERVAL, MAX_PAGES, LOOKBACK_DAYS (optional, default 21)
 alembic upgrade head
 uvicorn app.main:app --reload                        # API + scheduler
 cd frontend && npm install && npm run dev            # explorer on :5173, proxied to :8000
