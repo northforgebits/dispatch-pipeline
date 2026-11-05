@@ -45,7 +45,7 @@ def main():
         upserted = 0
 
         cutoff = datetime.now(timezone.utc) - timedelta(
-            days=settings.ingest_lookback_days
+            days=settings.lookback_days
         )
 
         for page in iter_phx_data_pages():
